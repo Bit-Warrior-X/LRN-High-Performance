@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+
+import socket
+import array
+import sys
+import os
+import tempfile
+import datetime
+import subprocess
+import tarfile
+import json
+import argparse
+import glob
+
+
+CALLFWD_SERVER_PATH = "/run/callfwd"
+if not os.path.exists(CALLFWD_SERVER_PATH):
+    XDG_RUNTIME_DIR = os.getenv("XDG_RUNTIME_DIR")
+    CALLFWD_SERVER_PATH = os.path.join(XDG_RUNTIME_DIR, "callfwd")
+
+
+class CallFwdControl(object):
+    def __init__(self, doorbell, server=None):
+        if server is None:
+            server = CALLFWD_SERVER_PATH
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        sock.bind(doorbell)
+        sock.connect(server)
+        self.sock = sock
+
+    def _make_request(self, msg, fds):
+        msg["stderr"] = len(fds)
+        cdata = array.array("i", fds + [2])
+        cmsg = (socket.SOL_SOCKET, socket.SCM_RIGHTS, cdata)
+        self.sock.sendmsg([json.dumps(msg).encode('ascii')], [cmsg])
+
+    def _wait_response(self):
+        msg,_,_,_ = self.sock.recvmsg(10)
+        print("Success" if msg == b'S' else 'Failure')
+        if msg != b'S':
+            exit(1)
+
+    def _read_db_op(self, msg, path):
+        msg["loaded"] = str(datetime.datetime.now())
+        msg["file_name"] = path
+        msg["stdin"] = 0
+        if path.endswith(".tar.gz"):
+            with tarfile.open(path) as tar:
+                ti = tar.next()
+                msg["inner_name"] = ti.name
+                msg["row_estimate"] = ti.size // 23
+
+            shell = ["tar", "xOf", path, msg["inner_name"]]
+            with subprocess.Popen(shell, stdout=subprocess.PIPE) as p:
+                self._make_request(msg, [p.stdout.fileno()])
+        else:
+            msg["row_estimate"] = os.stat(path).st_size // 23
+            with open(path, "r") as f:
+                self._make_request(msg, [f.fileno()])
+        self._wait_response()
+
+    def reload_db(self, path, country, update):
+        link_to = None
+        if update is not None:
+            candidates = sorted(glob.glob(update))
+            if len(candidates) > 0:
+                link_to = path
+                path = candidates[-1]
+
+        msg = { "cmd": "reload" }
+        msg["country"] = country
+        self._read_db_op(msg, path)
+
+        if link_to is not None:
+            if os.path.exists(link_to):
+                os.unlink(link_to)
+            os.symlink(path, link_to)
+
+    def reloaddnc_db(self, path, country, update):
+        link_to = None
+        if update is not None:
+            candidates = sorted(glob.glob(update))
+            if len(candidates) > 0:
+                link_to = path
+                path = candidates[-1]
+
+        msg = { "cmd": "reloaddnc" }
+        msg["country"] = country
+        self._read_db_op(msg, path)
+
+        if link_to is not None:
+            if os.path.exists(link_to):
+                os.unlink(link_to)
+            os.symlink(path, link_to)
+
+    def verify_db(self, path, country):
+        msg = { "cmd": "verify" }
+        msg["country"] = country
+        self._read_db_op(msg, path)
+
+    def dump_db(self, path, country):
+        msg = { "cmd": "dump" }
+        msg["file_name"] = path
+        msg["country"] = country
+        msg["stdout"] = 0
+        with open(path, "w+") as f:
+            self._make_request(msg, [f.fileno()])
+        self._wait_response()
+
+    def reload_acl(self, acl):
+        msg = { "cmd": "acl" }
+        msg["file_name"] = acl
+        msg["stdin"] = 0
+        with open(acl, "r") as f:
+            self._make_request(msg, [f.fileno()])
+        self._wait_response()
+
+    def status(self):
+        msg = { "cmd": "meta" }
+        self._make_request(msg, [])
+        self._wait_response()
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-S', '--socket', type=str, default=CALLFWD_SERVER_PATH,
+                        help="Path to server control socket")
+    subparsers = parser.add_subparsers()
+
+    reload_group = subparsers.add_parser('reload')
+    reload_group.add_argument('-c', '--country', type=str, default='US',
+                              help="Country code (US, CA)")
+    reload_group.add_argument('-u', '--update', type=str, default=None,
+                              help="A directory where to search for updates")
+    reload_group.add_argument('db', type=str, help="Path to database")
+    reload_group.set_defaults(func=CallFwdControl.reload_db)
+    reload_group.set_defaults(args=['db', 'country', 'update'])
+
+    reloaddnc_group = subparsers.add_parser('reloaddnc')
+    reloaddnc_group.add_argument('-c', '--country', type=str, default='US',
+                              help="Country code (US, CA)")
+    reloaddnc_group.add_argument('-u', '--update', type=str, default=None,
+                              help="A directory where to search for updates")
+    reloaddnc_group.add_argument('db', type=str, help="Path to database")
+    reloaddnc_group.set_defaults(func=CallFwdControl.reloaddnc_db)
+    reloaddnc_group.set_defaults(args=['db', 'country', 'update'])
+
+    verify_group = subparsers.add_parser('verify')
+    verify_group.add_argument('-c', '--country', type=str, default='US',
+                              help="Country code (US, CA)")
+    verify_group.add_argument('db', type=str, help="Path to database")
+    verify_group.set_defaults(func=CallFwdControl.verify_db)
+    verify_group.set_defaults(args=['db', 'country'])
+
+    dump_group = subparsers.add_parser('dump')
+    dump_group.add_argument('-c', '--country', type=str, default='US',
+                            help="Country code (US, CA)")
+    dump_group.add_argument('db', type=str, help="Path to database")
+    dump_group.set_defaults(func=CallFwdControl.dump_db)
+    dump_group.set_defaults(args=['db', 'country'])
+
+    acl_group = subparsers.add_parser('acl')
+    acl_group.add_argument('csv', type=str, help="Path to PGSQL dump")
+    acl_group.set_defaults(func=CallFwdControl.reload_acl)
+    acl_group.set_defaults(args=['csv'])
+
+    status_group = subparsers.add_parser('status')
+    status_group.set_defaults(func=CallFwdControl.status)
+    status_group.set_defaults(args=[])
+
+    options = parser.parse_args()
+
+    with tempfile.TemporaryDirectory('callfwdctl') as tmpdir:
+        doorbell = os.path.join(tmpdir, 'doorbell')
+        ctl = CallFwdControl(doorbell, options.socket)
+        options.func(ctl, *map(options.__getattribute__, options.args))

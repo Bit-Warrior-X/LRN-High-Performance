@@ -1,0 +1,6 @@
+build/
+build.centos/
+deps
+deps.arch/
+deps.centos/
+data/*-lrn-bigdata*

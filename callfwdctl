@@ -40,7 +40,7 @@ class CallFwdControl(object):
         if msg != b'S':
             exit(1)
 
-    def _read_db_op(self, msg, path):
+    def _read_db_op(self, msg, path, row_size):
         msg["loaded"] = str(datetime.datetime.now())
         msg["file_name"] = path
         msg["stdin"] = 0
@@ -49,12 +49,11 @@ class CallFwdControl(object):
                 ti = tar.next()
                 msg["inner_name"] = ti.name
                 msg["row_estimate"] = ti.size // 23
-
             shell = ["tar", "xOf", path, msg["inner_name"]]
             with subprocess.Popen(shell, stdout=subprocess.PIPE) as p:
                 self._make_request(msg, [p.stdout.fileno()])
         else:
-            msg["row_estimate"] = os.stat(path).st_size // 23
+            msg["row_estimate"] = os.stat(path).st_size // row_size
             with open(path, "r") as f:
                 self._make_request(msg, [f.fileno()])
         self._wait_response()
@@ -69,14 +68,14 @@ class CallFwdControl(object):
 
         msg = { "cmd": "reload" }
         msg["country"] = country
-        self._read_db_op(msg, path)
+        self._read_db_op(msg, path, 23)
 
         if link_to is not None:
             if os.path.exists(link_to):
                 os.unlink(link_to)
             os.symlink(path, link_to)
 
-    def reloaddnc_db(self, path, country, update):
+    def dnc_reload_db(self, path, update):
         link_to = None
         if update is not None:
             candidates = sorted(glob.glob(update))
@@ -84,9 +83,8 @@ class CallFwdControl(object):
                 link_to = path
                 path = candidates[-1]
 
-        msg = { "cmd": "reloaddnc" }
-        msg["country"] = country
-        self._read_db_op(msg, path)
+        msg = { "cmd": "dnc_reload" }
+        self._read_db_op(msg, path, 11)
 
         if link_to is not None:
             if os.path.exists(link_to):
@@ -136,14 +134,12 @@ if __name__ == '__main__':
     reload_group.set_defaults(func=CallFwdControl.reload_db)
     reload_group.set_defaults(args=['db', 'country', 'update'])
 
-    reloaddnc_group = subparsers.add_parser('reloaddnc')
-    reloaddnc_group.add_argument('-c', '--country', type=str, default='US',
-                              help="Country code (US, CA)")
-    reloaddnc_group.add_argument('-u', '--update', type=str, default=None,
+    dnc_reload_group = subparsers.add_parser('dnc_reload')
+    dnc_reload_group.add_argument('-u', '--update', type=str, default=None,
                               help="A directory where to search for updates")
-    reloaddnc_group.add_argument('db', type=str, help="Path to database")
-    reloaddnc_group.set_defaults(func=CallFwdControl.reloaddnc_db)
-    reloaddnc_group.set_defaults(args=['db', 'country', 'update'])
+    dnc_reload_group.add_argument('db', type=str, help="Path to database")
+    dnc_reload_group.set_defaults(func=CallFwdControl.dnc_reload_db)
+    dnc_reload_group.set_defaults(args=['db', 'update'])
 
     verify_group = subparsers.add_parser('verify')
     verify_group.add_argument('-c', '--country', type=str, default='US',

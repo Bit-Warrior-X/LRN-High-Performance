@@ -392,7 +392,7 @@ try {
   if (cmd == "reload") {
     if (loadMappingFile(stdinPath, msg))
       status = 'S';
-  } if (cmd == "reloaddnc") {
+  } else if (cmd == "dnc_reload") {
     if (loadDNCMappingFile(stdinPath, msg))
       status = 'S';
   } else if (cmd == "verify") {

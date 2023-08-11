@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <atomic>
 #include <istream>
+#include <string>
 
 #include <folly/Range.h>
 #include <folly/synchronization/HazptrHolder.h>
@@ -42,6 +43,10 @@ class DncMapping {
 
     /** Build indexes and commit data to global. */
     void commit(std::atomic<Data*> &global);
+
+    /* delete specific character in the string*/
+    std::string deleteCharacter(const std::string& input, char character);
+
   private:
     std::unique_ptr<Data> data_;
   };

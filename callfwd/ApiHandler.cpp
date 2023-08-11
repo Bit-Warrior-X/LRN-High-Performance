@@ -113,48 +113,32 @@ class TargetHandler final : public RequestHandler {
       if (rn == PhoneNumber::NONE)
         rn = ca_rn_[i];
 
+      std::string dnc_str;
+      std::string lrn_str;
+      
       if (json_) {
-        if (rn != PhoneNumber::NONE) {
-            if (!dncAvaiable)
-              folly::format(&record, "  {{\"pn\": \"{}\", \"rn\": \"{}\", \"dnc\": null}},\n", pn_[i], rn);
-            else {
-              if (us_dnc_[i] == 1)
-                folly::format(&record, "  {{\"pn\": \"{}\", \"rn\": \"{}\", \"dnc\": yes}},\n", pn_[i], rn);
-              else
-                folly::format(&record, "  {{\"pn\": \"{}\", \"rn\": \"{}\", \"dnc\": no}},\n", pn_[i], rn);
-            }
-          }
-        else {
-          if (!dncAvaiable)
-            folly::format(&record, "  {{\"pn\": \"{}\", \"rn\": null, \"dnc\": null}},\n", pn_[i]);
-          else {
-            if (us_dnc_[i] == 1)
-              folly::format(&record, "  {{\"pn\": \"{}\", \"rn\": null, \"dnc\": yes}},\n", pn_[i]);
-            else
-              folly::format(&record, "  {{\"pn\": \"{}\", \"rn\": null, \"dnc\": no}},\n", pn_[i]);
-          }
-        }
+        if (!dncAvaiable || us_dnc_[i] == 0)
+          dnc_str = std::string("\"is_dnc\": no");
+        else
+          dnc_str = std::string("\"is_dnc\": yes");
+
+        if (rn != PhoneNumber::NONE)
+          lrn_str = folly::format("  \"pn\": \"{}\", \"rn\": \"{}\"", pn_[i], rn).str();
+        else
+          lrn_str = folly::format("  \"pn\": \"{}\", \"rn\": null", pn_[i]).str();
+
+        folly::format(&record, "{{{},{}}},\n", lrn_str, dnc_str);
+
       } else {
-        if (rn != PhoneNumber::NONE) {
-          if (!dncAvaiable)
-            folly::format(&record, "{},{}\n", pn_[i], rn);
-          else {
-            if (us_dnc_[i] == 1)
-              folly::format(&record, "{},{},dnc=yes\n", pn_[i], rn);
-            else
-              folly::format(&record, "{},{},dnc=no\n", pn_[i], rn);
-          }
-        }
-        else {
-          if (!dncAvaiable)
-            folly::format(&record, "{},\n", pn_[i]);
-          else {
-            if (us_dnc_[i] == 1)
-              folly::format(&record, "{},dnc=yes\n", pn_[i]);
-            else
-              folly::format(&record, "{},dnc=no\n", pn_[i]);
-          }
-        }
+        if (!dncAvaiable || us_dnc_[i] == 0)
+          dnc_str = std::string("is_dnc=no");
+        else
+          dnc_str = std::string("is_dnc=yes");
+
+        if (rn != PhoneNumber::NONE)
+          lrn_str = folly::format("pn={},lrn={}, ", pn_[i], rn).str();
+        else
+          lrn_str = folly::format("pn={}, ", pn_[i]).str();
       }
 
       if (record.size() > 1000) {

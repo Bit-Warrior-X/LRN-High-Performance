@@ -133,8 +133,18 @@ DncMapping::Builder& DncMapping::Builder::addRow(uint64_t pn, uint64_t dnc) {
   return *this;
 }
 
+std::string DncMapping::Builder::deleteCharacter(const std::string& input, char character) {
+    std::string result;
+    for (char c : input) {
+        if (c != character) {
+            result += c;
+        }
+    }
+    return result;
+}
 void DncMapping::Builder::fromCSV(std::istream &in, size_t &line, size_t limit) {
   std::string linebuf;
+  std::string number;
   std::vector<uint64_t> rowbuf;
 
   for (limit += line; line < limit; ++line) {
@@ -142,11 +152,13 @@ void DncMapping::Builder::fromCSV(std::istream &in, size_t &line, size_t limit) 
       break;
     std::getline(in, linebuf);
     rowbuf.clear();
-    folly::split(',', linebuf, rowbuf);
-    if (rowbuf.size() == 1)
-      addRow(rowbuf[0], 1);
-    else
-      throw std::runtime_error("bad number of columns");
+    number = deleteCharacter(linebuf, ',');
+
+    std::istringstream iss(number);
+    uint64_t pn;
+    iss >> pn;
+
+    addRow(pn, 1);
   }
 }
 

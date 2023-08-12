@@ -91,6 +91,70 @@ class CallFwdControl(object):
                 os.unlink(link_to)
             os.symlink(path, link_to)
 
+    def dno_reload_db(self, path, update):
+        link_to = None
+        if update is not None:
+            candidates = sorted(glob.glob(update))
+            if len(candidates) > 0:
+                link_to = path
+                path = candidates[-1]
+
+        msg = { "cmd": "dno_reload" }
+        self._read_db_op(msg, path, 38)
+
+        if link_to is not None:
+            if os.path.exists(link_to):
+                os.unlink(link_to)
+            os.symlink(path, link_to)
+
+    def dno_npa_reload_db(self, path, update):
+        link_to = None
+        if update is not None:
+            candidates = sorted(glob.glob(update))
+            if len(candidates) > 0:
+                link_to = path
+                path = candidates[-1]
+
+        msg = { "cmd": "dno_npa_reload" }
+        self._read_db_op(msg, path, 7)
+
+        if link_to is not None:
+            if os.path.exists(link_to):
+                os.unlink(link_to)
+            os.symlink(path, link_to)
+
+    def dno_npa_nxx_reload_db(self, path, update):
+        link_to = None
+        if update is not None:
+            candidates = sorted(glob.glob(update))
+            if len(candidates) > 0:
+                link_to = path
+                path = candidates[-1]
+
+        msg = { "cmd": "dno_npa_nxx_reload" }
+        self._read_db_op(msg, path, 11)
+
+        if link_to is not None:
+            if os.path.exists(link_to):
+                os.unlink(link_to)
+            os.symlink(path, link_to)
+
+    def dno_npa_nxx_x_reload_db(self, path, update):
+        link_to = None
+        if update is not None:
+            candidates = sorted(glob.glob(update))
+            if len(candidates) > 0:
+                link_to = path
+                path = candidates[-1]
+
+        msg = { "cmd": "dno_npa_nxx_x_reload" }
+        self._read_db_op(msg, path, 37)
+
+        if link_to is not None:
+            if os.path.exists(link_to):
+                os.unlink(link_to)
+            os.symlink(path, link_to)
+
     def tollfree_reload_db(self, path, update):
         link_to = None
         if update is not None:
@@ -156,6 +220,34 @@ if __name__ == '__main__':
     dnc_reload_group.add_argument('db', type=str, help="Path to database")
     dnc_reload_group.set_defaults(func=CallFwdControl.dnc_reload_db)
     dnc_reload_group.set_defaults(args=['db', 'update'])
+
+    dno_reload_group = subparsers.add_parser('dno_reload')
+    dno_reload_group.add_argument('-u', '--update', type=str, default=None,
+                              help="A directory where to search for updates")
+    dno_reload_group.add_argument('db', type=str, help="Path to database")
+    dno_reload_group.set_defaults(func=CallFwdControl.dno_reload_db)
+    dno_reload_group.set_defaults(args=['db', 'update'])
+
+    dno_npa_reload_group = subparsers.add_parser('dno_npa_reload')
+    dno_npa_reload_group.add_argument('-u', '--update', type=str, default=None,
+                              help="A directory where to search for updates")
+    dno_npa_reload_group.add_argument('db', type=str, help="Path to database")
+    dno_npa_reload_group.set_defaults(func=CallFwdControl.dno_npa_reload_db)
+    dno_npa_reload_group.set_defaults(args=['db', 'update'])
+
+    dno_npa_nxx_reload_group = subparsers.add_parser('dno_npa_nxx_reload')
+    dno_npa_nxx_reload_group.add_argument('-u', '--update', type=str, default=None,
+                              help="A directory where to search for updates")
+    dno_npa_nxx_reload_group.add_argument('db', type=str, help="Path to database")
+    dno_npa_nxx_reload_group.set_defaults(func=CallFwdControl.dno_npa_nxx_reload_db)
+    dno_npa_nxx_reload_group.set_defaults(args=['db', 'update'])
+
+    dno_npa_nxx_x_reload_group = subparsers.add_parser('dno_npa_nxx_x_reload')
+    dno_npa_nxx_x_reload_group.add_argument('-u', '--update', type=str, default=None,
+                              help="A directory where to search for updates")
+    dno_npa_nxx_x_reload_group.add_argument('db', type=str, help="Path to database")
+    dno_npa_nxx_x_reload_group.set_defaults(func=CallFwdControl.dno_npa_nxx_x_reload_db)
+    dno_npa_nxx_x_reload_group.set_defaults(args=['db', 'update'])
 
     tollfree_reload_group = subparsers.add_parser('tollfree_reload')
     tollfree_reload_group.add_argument('-u', '--update', type=str, default=None,

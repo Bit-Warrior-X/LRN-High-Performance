@@ -11,6 +11,7 @@ set(SOURCES
   CallFwd.cpp
   DncMapping.cpp
   TollFreeMapping.cpp
+  DnoMapping.cpp
   )
 
 add_executable(callfwd ${SOURCES})

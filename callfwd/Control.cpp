@@ -19,6 +19,7 @@
 #include "CallFwd.h"
 #include "PhoneMapping.h"
 #include "DncMapping.h"
+#include "TollFreeMapping.h"
 #include "ACL.h"
 
 using folly::StringPiece;
@@ -30,11 +31,13 @@ static auto reportPeriod = std::chrono::seconds(30);
 static std::atomic<PhoneMapping::Data*> mappingUS;
 static std::atomic<PhoneMapping::Data*> mappingCA;
 static std::atomic<DncMapping::Data*> mappingDNC;
+static std::atomic<TollFreeMapping::Data*> mappingTollFree;
 static std::atomic<ACL::Data*> currentACL;
 
 PhoneMapping PhoneMapping::getUS() noexcept { return { mappingUS }; }
 PhoneMapping PhoneMapping::getCA() noexcept { return { mappingCA }; }
 DncMapping DncMapping::getDNC() noexcept { return { mappingDNC }; }
+TollFreeMapping TollFreeMapping::getTollFree() noexcept { return { mappingTollFree }; }
 
 bool PhoneMapping::isAvailable() noexcept {
   return !!mappingUS.load() && !!mappingCA.load();
@@ -42,6 +45,10 @@ bool PhoneMapping::isAvailable() noexcept {
 
 bool DncMapping::isAvailable() noexcept {
   return !!mappingDNC.load();
+}
+
+bool TollFreeMapping::isAvailable() noexcept {
+  return !!mappingTollFree.load();
 }
 
 ACL ACL::get() noexcept { return { currentACL }; }
@@ -158,6 +165,47 @@ static bool loadDNCMappingFile(const std::string &path, folly::dynamic meta)
 
   LOG(INFO) << "Building index (" << nrows << " rows)...";
   builder.commit(mappingDNC);
+  folly::hazptr_cleanup();
+  return true;
+}
+
+static bool loadTollFreeMappingFile(const std::string &path, folly::dynamic meta)
+{
+  int64_t estimate = meta.getDefault("row_estimate", 0).asInt();
+  const std::string &name = meta.getDefault("file_name", path).asString();
+
+  std::ifstream in;
+  std::vector<char> rbuf(1ull << 19);
+  folly::stop_watch<> watch;
+
+  TollFreeMapping::Builder builder;
+  size_t nrows = 0;
+
+  try {
+    in.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+    in.rdbuf()->pubsetbuf(rbuf.data(), rbuf.size());
+    in.open(path);
+
+    builder.sizeHint(estimate + estimate / 20);
+
+    LOG(INFO) << "Reading database from " << name
+      << " (" << estimate << " rows estimated)";
+
+    while (in.good()) {
+      builder.fromCSV(in, nrows, 10000);
+      if (watch.lap(reportPeriod)) {
+        LOG_IF(INFO, estimate != 0) << nrows * 100 / estimate << "% completed";
+        LOG_IF(INFO, estimate == 0) << nrows << " rows read";
+      }
+    }
+    in.close();
+  } catch (std::runtime_error &e) {
+    LOG(ERROR) << osBasename(name) << ':' << nrows << ": " << e.what();
+    return false;
+  }
+
+  LOG(INFO) << "Building index (" << nrows << " rows)...";
+  builder.commit(mappingTollFree);
   folly::hazptr_cleanup();
   return true;
 }
@@ -394,6 +442,9 @@ try {
       status = 'S';
   } else if (cmd == "dnc_reload") {
     if (loadDNCMappingFile(stdinPath, msg))
+      status = 'S';
+  } else if (cmd == "tollfree_reload") {
+    if (loadTollFreeMappingFile(stdinPath, msg))
       status = 'S';
   } else if (cmd == "verify") {
     if (verifyMappingFile(stdinPath, msg))

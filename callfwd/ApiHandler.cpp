@@ -15,6 +15,7 @@
 
 #include "PhoneMapping.h"
 #include "DncMapping.h"
+#include "TollFreeMapping.h"
 #include "AccessLog.h"
 
 using namespace proxygen;
@@ -78,27 +79,40 @@ class TargetHandler final : public RequestHandler {
   void onQueryComplete() noexcept {
     size_t N = pn_.size();
     std::string record;
-    bool dncAvaiable = false;
+    bool dncAvailable = false;
+    bool tollfreeAvailable = false;
 
     if (LIKELY(DncMapping::isAvailable())) {
-      dncAvaiable = true;
+      dncAvailable = true;
     } else {
-      dncAvaiable = false;
+      dncAvailable = false;
+    }
+
+    if (LIKELY(TollFreeMapping::isAvailable())) {
+      tollfreeAvailable = true;
+    } else {
+      tollfreeAvailable = false;
     }
 
     us_rn_.resize(N);
     ca_rn_.resize(N);
-    if (dncAvaiable)
+    if (dncAvailable)
       us_dnc_.resize(N);
+    if (tollfreeAvailable)
+      us_tollfree_.resize(N);
 
     PhoneMapping::getUS()
       .getRNs(N, pn_.data(), us_rn_.data());
     PhoneMapping::getCA()
       .getRNs(N, pn_.data(), ca_rn_.data());
 
-    if (dncAvaiable)
+    if (dncAvailable)
       DncMapping::getDNC()
         .getDNCs(N, pn_.data(), us_dnc_.data());
+
+    if (tollfreeAvailable)
+      TollFreeMapping::getTollFree()
+        .getTollFrees(N, pn_.data(), us_tollfree_.data());
 
     ResponseBuilder(downstream_)
       .status(200, "OK")
@@ -113,33 +127,43 @@ class TargetHandler final : public RequestHandler {
       if (rn == PhoneNumber::NONE)
         rn = ca_rn_[i];
 
-      std::string dnc_str;
       std::string lrn_str;
+      std::string dnc_str;
+      std::string tollfree_str;
       
       if (json_) {
-        if (!dncAvaiable || us_dnc_[i] == 0)
-          dnc_str = std::string("\"is_dnc\": no");
-        else
-          dnc_str = std::string("\"is_dnc\": yes");
-
         if (rn != PhoneNumber::NONE)
-          lrn_str = folly::format("  \"pn\": \"{}\", \"rn\": \"{}\"", pn_[i], rn).str();
+          lrn_str = folly::format("\"pn\": \"{}\", \"rn\": \"{}\"", pn_[i], rn).str();
         else
-          lrn_str = folly::format("  \"pn\": \"{}\", \"rn\": null", pn_[i]).str();
+          lrn_str = folly::format("\"pn\": \"{}\", \"rn\": null", pn_[i]).str();
 
-        folly::format(&record, "{{{},{}}},\n", lrn_str, dnc_str);
-
+        if (!dncAvailable || us_dnc_[i] == 0)
+          dnc_str = std::string("\"is_dnc\": \"no\"");
+        else
+          dnc_str = std::string("\"is_dnc\": \"yes\");
+          
+        if (!tollfreeAvailable || us_tollfree_[i] == 0)
+          tollfree_str = std::string("\"is_tollfree\": \"no\"");
+        else
+          tollfree_str = std::string("\"is_tollfree\": \"yes\"");
       } else {
-        if (!dncAvaiable || us_dnc_[i] == 0)
+        if (rn != PhoneNumber::NONE)
+          lrn_str = folly::format("pn={},lrn={}", pn_[i], rn).str();
+        else
+          lrn_str = folly::format("pn={}, ", pn_[i]).str();
+
+        if (!dncAvailable || us_dnc_[i] == 0)
           dnc_str = std::string("is_dnc=no");
         else
           dnc_str = std::string("is_dnc=yes");
 
-        if (rn != PhoneNumber::NONE)
-          lrn_str = folly::format("pn={},lrn={}, ", pn_[i], rn).str();
+        if (!tollfreeAvailable || us_tollfree_[i] == 0)
+          tollfree_str = std::string("is_tollfree=no");
         else
-          lrn_str = folly::format("pn={}, ", pn_[i]).str();
+          tollfree_str = std::string("is_tollfree=yes");
       }
+
+      folly::format(&record, "  {{{},{},{}}},\n", lrn_str, dnc_str, tollfree_str);
 
       if (record.size() > 1000) {
         downstream_->sendBody(folly::IOBuf::copyBuffer(record));
@@ -214,6 +238,7 @@ class TargetHandler final : public RequestHandler {
   folly::small_vector<uint64_t, 16> us_rn_;
   folly::small_vector<uint64_t, 16> ca_rn_;
   folly::small_vector<uint64_t, 16> us_dnc_;
+  folly::small_vector<uint64_t, 16> us_tollfree_;
 };
 
 class ReverseHandler final : public RequestHandler {

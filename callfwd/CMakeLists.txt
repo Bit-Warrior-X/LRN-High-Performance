@@ -9,6 +9,8 @@ set(SOURCES
   SipHandler.cpp
   Control.cpp
   CallFwd.cpp
+  DncMapping.cpp
+  TollFreeMapping.cpp
   )
 
 add_executable(callfwd ${SOURCES})

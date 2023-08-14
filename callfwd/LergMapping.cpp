@@ -180,12 +180,12 @@ LergMapping::Builder& LergMapping::Builder::addRow(std::vector<std::string> rowb
 
     LergData data;
     data.lerg_key = lerg_key;
-    data.company = rowbuf[4];
-    data.ocn = rowbuf[5];
-    data.rate_center = rowbuf[6];
-    data.ocn_type = rowbuf[7];
-    data.lata = rowbuf[8];
-    data.country = rowbuf[9];
+    data.company = (rowbuf[4] == "" ? std::string(" ") : rowbuf[4]);
+    data.ocn = (rowbuf[5] == "" ? std::string(" ") : rowbuf[5]);
+    data.rate_center = (rowbuf[6] == "" ? std::string(" ") : rowbuf[6]);
+    data.ocn_type = (rowbuf[7] == "" ? std::string(" ") : rowbuf[7]);;
+    data.lata = (rowbuf[8] == "" ? std::string(" ") : rowbuf[8]);;
+    data.country = (rowbuf[9] == "" ? std::string(" ") : rowbuf[9]);;
 
     data_->dic_npa_nxx_x.emplace(lerg_key, data);
   }

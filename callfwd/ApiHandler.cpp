@@ -118,6 +118,8 @@ class TargetHandler final : public RequestHandler {
       us_dno_.resize(N);
     if (tollfreeAvailable)
       us_tollfree_.resize(N);
+    if (lergAvailable)
+      us_lerg_.resize(N);
 
     PhoneMapping::getUS()
       .getRNs(N, pn_.data(), us_rn_.data());
@@ -138,6 +140,7 @@ class TargetHandler final : public RequestHandler {
 
     if (lergAvailable) {
       folly::small_vector<uint64_t, 16> lerg_search_key;
+      lerg_search_key.resize(N);
 
       for (size_t i = 0; i < N; ++i) {
         uint64_t rn = us_rn_[i];
@@ -145,9 +148,9 @@ class TargetHandler final : public RequestHandler {
           rn = ca_rn_[i];
         
         if (rn != PhoneNumber::NONE)
-          lerg_search_key.push_back(rn);
+          lerg_search_key[i] = rn;
         else
-          lerg_search_key.push_back(pn_[i]);
+          lerg_search_key[i] = pn_[i];
       }
 
       LergMapping::getLerg()
@@ -196,15 +199,20 @@ class TargetHandler final : public RequestHandler {
 
         if (!lergAvailable || us_lerg_[i].lerg_key == 0)
           lerg_str = std::string("\"ocn\":: null, \"operator\": null, \"ocn_type\": null, \"lata\": null, \"rate_center\": null, \"country\": null");
-        else
-          lerg_str = folly::format("\"ocn\": \"{}\", \"operator\": \"{}\", \"ocn_type\": \"{}\", \"lata\": \"{}\", \"rate_center\": \"{}\", \"country\": \"{}\"", 
-            us_lerg_[i].ocn, us_lerg_[i].company, us_lerg_[i].ocn_type, us_lerg_[i].lata, us_lerg_[i].rate_center, us_lerg_[i].country).str();
+        else {
+          char buffer[1024];
+          std::printf(buffer, "\"ocn\": \"%s\", \"operator\": \"%s\", \"ocn_type\": \"%s\", \"lata\": \"%s\", \"rate_center\": \"%s\", \"country\": \"%s\"",
+              us_lerg_[i].ocn.c_str(), us_lerg_[i].company.c_str(), us_lerg_[i].ocn_type.c_str(), 
+              us_lerg_[i].lata.c_str(), us_lerg_[i].rate_center.c_str(), us_lerg_[i].country.c_str());
+          lerg_str = std::string(buffer);  
+        }
+          
 
       } else {
         if (rn != PhoneNumber::NONE)
           lrn_str = folly::format("pn={},lrn={}", pn_[i], rn).str();
         else
-          lrn_str = folly::format("pn={}, ", pn_[i]).str();
+          lrn_str = folly::format("pn={},lrn=null", pn_[i]).str();
 
         if (!dncAvailable || us_dnc_[i] == 0)
           dnc_str = std::string("is_dnc=no");
@@ -222,10 +230,16 @@ class TargetHandler final : public RequestHandler {
           tollfree_str = std::string("is_tollfree=yes");
         
         if (!lergAvailable || us_lerg_[i].lerg_key == 0)
-          lerg_str = std::string("ocn=,operator=,ocn_type=,lata=,rate_center=,country=");
-        else
-          lerg_str = folly::format("ocn={},operator={},ocn_type={},lata={},rate_center={},country={}", 
-            us_lerg_[i].ocn, us_lerg_[i].company, us_lerg_[i].ocn_type, us_lerg_[i].lata, us_lerg_[i].rate_center, us_lerg_[i].country).str();
+          lerg_str = std::string("ocn= ,operator= ,ocn_type= ,lata= ,rate_center= ,country= ");
+        else {
+          char buffer[1024];
+          std::sprintf(buffer, "ocn=%s,operator=%s,ocn_type=%s,lata=%s,rate_center=%s,country=%s", 
+              us_lerg_[i].ocn.c_str(), us_lerg_[i].company.c_str(), us_lerg_[i].ocn_type.c_str(), 
+              us_lerg_[i].lata.c_str(), us_lerg_[i].rate_center.c_str(), us_lerg_[i].country.c_str()
+            );
+          lerg_str = std::string(buffer);
+        }
+          
       }
 
       folly::format(&record, "  {{{},{},{},{},{}}},\n", lrn_str, dno_str, dnc_str, tollfree_str, lerg_str);

@@ -171,6 +171,22 @@ class CallFwdControl(object):
                 os.unlink(link_to)
             os.symlink(path, link_to)
 
+    def lerg_reload_db(self, path, update):
+        link_to = None
+        if update is not None:
+            candidates = sorted(glob.glob(update))
+            if len(candidates) > 0:
+                link_to = path
+                path = candidates[-1]
+
+        msg = { "cmd": "lerg_reload" }
+        self._read_db_op(msg, path, 69)
+
+        if link_to is not None:
+            if os.path.exists(link_to):
+                os.unlink(link_to)
+            os.symlink(path, link_to)
+
     def verify_db(self, path, country):
         msg = { "cmd": "verify" }
         msg["country"] = country
@@ -255,6 +271,13 @@ if __name__ == '__main__':
     tollfree_reload_group.add_argument('db', type=str, help="Path to database")
     tollfree_reload_group.set_defaults(func=CallFwdControl.tollfree_reload_db)
     tollfree_reload_group.set_defaults(args=['db', 'update'])
+
+    lerg_reload_group = subparsers.add_parser('lerg_reload')
+    lerg_reload_group.add_argument('-u', '--update', type=str, default=None,
+                              help="A directory where to search for updates")
+    lerg_reload_group.add_argument('db', type=str, help="Path to database")
+    lerg_reload_group.set_defaults(func=CallFwdControl.lerg_reload_db)
+    lerg_reload_group.set_defaults(args=['db', 'update'])
 
     verify_group = subparsers.add_parser('verify')
     verify_group.add_argument('-c', '--country', type=str, default='US',

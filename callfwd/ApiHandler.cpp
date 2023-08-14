@@ -17,6 +17,7 @@
 #include "DncMapping.h"
 #include "DnoMapping.h"
 #include "TollFreeMapping.h"
+#include "LergMapping.h"
 #include "AccessLog.h"
 
 using namespace proxygen;
@@ -83,6 +84,7 @@ class TargetHandler final : public RequestHandler {
     bool dnoAvailable = false;
     bool dncAvailable = false;
     bool tollfreeAvailable = false;
+    bool lergAvailable = false;
 
     if (LIKELY(DncMapping::isAvailable())) {
       dncAvailable = true;
@@ -100,6 +102,12 @@ class TargetHandler final : public RequestHandler {
       tollfreeAvailable = true;
     } else {
       tollfreeAvailable = false;
+    }
+
+    if (LIKELY(LergMapping::isAvailable())) {
+      lergAvailable = true;
+    } else {
+      lergAvailable = false;
     }
 
     us_rn_.resize(N);
@@ -128,6 +136,24 @@ class TargetHandler final : public RequestHandler {
       TollFreeMapping::getTollFree()
         .getTollFrees(N, pn_.data(), us_tollfree_.data());
 
+    if (lergAvailable) {
+      folly::small_vector<uint64_t, 16> lerg_search_key;
+
+      for (size_t i = 0; i < N; ++i) {
+        uint64_t rn = us_rn_[i];
+        if (rn == PhoneNumber::NONE)
+          rn = ca_rn_[i];
+        
+        if (rn != PhoneNumber::NONE)
+          lerg_search_key.push_back(rn);
+        else
+          lerg_search_key.push_back(pn_[i]);
+      }
+
+      LergMapping::getLerg()
+        .getLergs(N, lerg_search_key.data(), us_lerg_.data());
+    }
+
     ResponseBuilder(downstream_)
       .status(200, "OK")
       .header(HTTP_HEADER_CONTENT_TYPE,
@@ -145,6 +171,7 @@ class TargetHandler final : public RequestHandler {
       std::string dno_str;
       std::string dnc_str;
       std::string tollfree_str;
+      std::string lerg_str;
       
       if (json_) {
         if (rn != PhoneNumber::NONE)
@@ -166,6 +193,13 @@ class TargetHandler final : public RequestHandler {
           tollfree_str = std::string("\"is_tollfree\": \"no\"");
         else
           tollfree_str = std::string("\"is_tollfree\": \"yes\"");
+
+        if (!lergAvailable || us_lerg_[i].lerg_key == 0)
+          lerg_str = std::string("\"ocn\":: null, \"operator\": null, \"ocn_type\": null, \"lata\": null, \"rate_center\": null, \"country\": null");
+        else
+          lerg_str = folly::format("\"ocn\": \"{}\", \"operator\": \"{}\", \"ocn_type\": \"{}\", \"lata\": \"{}\", \"rate_center\": \"{}\", \"country\": \"{}\"", 
+            us_lerg_[i].ocn, us_lerg_[i].company, us_lerg_[i].ocn_type, us_lerg_[i].lata, us_lerg_[i].rate_center, us_lerg_[i].country).str();
+
       } else {
         if (rn != PhoneNumber::NONE)
           lrn_str = folly::format("pn={},lrn={}", pn_[i], rn).str();
@@ -186,9 +220,15 @@ class TargetHandler final : public RequestHandler {
           tollfree_str = std::string("is_tollfree=no");
         else
           tollfree_str = std::string("is_tollfree=yes");
+        
+        if (!lergAvailable || us_lerg_[i].lerg_key == 0)
+          lerg_str = std::string("ocn=,operator=,ocn_type=,lata=,rate_center=,country=");
+        else
+          lerg_str = folly::format("ocn={},operator={},ocn_type={},lata={},rate_center={},country={}", 
+            us_lerg_[i].ocn, us_lerg_[i].company, us_lerg_[i].ocn_type, us_lerg_[i].lata, us_lerg_[i].rate_center, us_lerg_[i].country).str();
       }
 
-      folly::format(&record, "  {{{},{},{},{}}},\n", lrn_str, dno_str, dnc_str, tollfree_str);
+      folly::format(&record, "  {{{},{},{},{},{}}},\n", lrn_str, dno_str, dnc_str, tollfree_str, lerg_str);
 
       if (record.size() > 1000) {
         downstream_->sendBody(folly::IOBuf::copyBuffer(record));
@@ -265,6 +305,7 @@ class TargetHandler final : public RequestHandler {
   folly::small_vector<uint64_t, 16> us_dnc_;
   folly::small_vector<uint64_t, 16> us_dno_;
   folly::small_vector<uint64_t, 16> us_tollfree_;
+  folly::small_vector<LergData, 16> us_lerg_;
 };
 
 class ReverseHandler final : public RequestHandler {

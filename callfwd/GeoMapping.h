@@ -1,5 +1,5 @@
-#ifndef CALLFWD_YoumailMapping_H
-#define CALLFWD_YoumailMapping_H
+#ifndef CALLFWD_GeoMapping_H
+#define CALLFWD_GeoMapping_H
 
 #include <cstdint>
 #include <memory>
@@ -14,15 +14,17 @@
 
 namespace folly { struct dynamic; }
 
-struct YoumailData {
-  uint64_t pn;
-  std::string sapmscore;
-  std::string fraudprobability;
-  std::string unlawful;
-  std::string tcpafraud;
+struct GeoData {
+  uint64_t npanxx;
+  std::string zipcode;
+  std::string county;
+  std::string city;
+  std::string latitude;
+  std::string longitude;
+  std::string timezone;
 };
 
-class YoumailMapping {
+class GeoMapping {
  public:
   class Data; /* opaque */
   class Cursor; /* opaque */
@@ -46,7 +48,7 @@ class YoumailMapping {
     void fromCSV(std::istream &in, size_t& line, size_t limit);
 
     /** Build indexes and release the data. */
-    YoumailMapping build();
+    GeoMapping build();
 
     /** Build indexes and commit data to global. */
     void commit(std::atomic<Data*> &global);
@@ -59,16 +61,16 @@ class YoumailMapping {
   };
 
   /** Construct taking ownership of Data. Used for tests. */
-  YoumailMapping(std::unique_ptr<Data> data);
+  GeoMapping(std::unique_ptr<Data> data);
   /** Construct from globals and hold protected reference. */
-  YoumailMapping(std::atomic<Data*> &global);
+  GeoMapping(std::atomic<Data*> &global);
   /** Ensure move constructor exists */
-  YoumailMapping(YoumailMapping&& rhs) noexcept;
-  /** Get default Youmail instance from global variable. */
-  static YoumailMapping getYoumail() noexcept;
+  GeoMapping(GeoMapping&& rhs) noexcept;
+  /** Get default Geo instance from global variable. */
+  static GeoMapping getGeo() noexcept;
   /** Check if DB fully loaded into memory. */
   static bool isAvailable() noexcept;
-  ~YoumailMapping() noexcept;
+  ~GeoMapping() noexcept;
 
   /** Get total number of records */
   size_t size() const noexcept;
@@ -78,11 +80,11 @@ class YoumailMapping {
 
   /** Get a routing number from portability number.
     * If key wasn't found returns NONE. */
-  YoumailData getYoumail(uint64_t pn) const;
+  GeoData getGeo(uint64_t pn) const;
 
   /** Get a routing number for a batch of keys.
-    * Faster than calling getYoumail() multiple times. */
-  void getYoumails(size_t N, const uint64_t *pn, YoumailData *Youmail) const;
+    * Faster than calling getGeo() multiple times. */
+  void getGeos(size_t N, const uint64_t *pn, GeoData *Geo) const;
 
  private:
   folly::hazptr_holder<> holder_;
@@ -90,4 +92,4 @@ class YoumailMapping {
   std::unique_ptr<Cursor> cursor_;
 };
 
-#endif // CALLFWD_YoumailMapping_H
+#endif // CALLFWD_GeoMapping_H

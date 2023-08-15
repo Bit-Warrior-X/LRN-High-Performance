@@ -19,6 +19,7 @@
 #include "TollFreeMapping.h"
 #include "LergMapping.h"
 #include "YoumailMapping.h"
+#include "GeoMapping.h"
 #include "AccessLog.h"
 
 using namespace proxygen;
@@ -87,6 +88,7 @@ class TargetHandler final : public RequestHandler {
     bool tollfreeAvailable = false;
     bool lergAvailable = false;
     bool youmailAvailable = false;
+    bool geoAvailable = false;
 
     if (LIKELY(DncMapping::isAvailable())) {
       dncAvailable = true;
@@ -118,6 +120,12 @@ class TargetHandler final : public RequestHandler {
       youmailAvailable = false;
     }
 
+    if (LIKELY(GeoMapping::isAvailable())) {
+      geoAvailable = true;
+    } else {
+      geoAvailable = false;
+    }
+
     us_rn_.resize(N);
     ca_rn_.resize(N);
     if (dncAvailable)
@@ -130,6 +138,8 @@ class TargetHandler final : public RequestHandler {
       us_lerg_.resize(N);
     if (youmailAvailable)
       us_youmail_.resize(N);
+    if (geoAvailable)
+      us_geo_.resize(N);
 
     PhoneMapping::getUS()
       .getRNs(N, pn_.data(), us_rn_.data());
@@ -171,6 +181,10 @@ class TargetHandler final : public RequestHandler {
       YoumailMapping::getYoumail()
         .getYoumails(N, pn_.data(), us_youmail_.data());
 
+    if (geoAvailable)
+      GeoMapping::getGeo()
+        .getGeos(N, pn_.data(), us_geo_.data());
+
     ResponseBuilder(downstream_)
       .status(200, "OK")
       .header(HTTP_HEADER_CONTENT_TYPE,
@@ -190,6 +204,7 @@ class TargetHandler final : public RequestHandler {
       std::string tollfree_str = std::string("");
       std::string lerg_str = std::string("");
       std::string youmail_str = std::string("");
+      std::string geo_str = std::string("");
       
       if (json_) {
         if (rn != PhoneNumber::NONE)
@@ -224,6 +239,13 @@ class TargetHandler final : public RequestHandler {
         else {
           youmail_str = folly::format("\"youmail_SpamScore\": \"{}\", \"youmail_FraudProbability\": \"{}\", \"youmail_Unlawful\": \"{}\", \"youmail_TCPAFraudProbability\": \"{}\"", 
             us_youmail_[i].sapmscore, us_youmail_[i].fraudprobability, us_youmail_[i].unlawful, us_youmail_[i].tcpafraud).str();
+        }
+        
+        if (!geoAvailable || us_geo_[i].npanxx == 0)
+          geo_str = std::string("\"zipcode\":: null, \"county\": null, \"city\": null, \" latitude\": null, \" longitude\": null, \" timezone\": null");
+        else {
+          geo_str = folly::format("\"zipcode\": \"{}\", \"county\": \"{}\", \"city\": \"{}\", \"latitude\": \"{}\", \"longitude\": \"{}\", \"timezone\": \"{}\"", 
+            us_geo_[i].zipcode, us_geo_[i].county, us_geo_[i].city, us_geo_[i].latitude, us_geo_[i].longitude, us_geo_[i].timezone).str();
         }
 
       } else {
@@ -266,9 +288,16 @@ class TargetHandler final : public RequestHandler {
           youmail_str = folly::format("youmail_SpamScore={}, youmail_FraudProbability={}, youmail_Unlawful={}, youmail_TCPAFraudProbability={}", 
             us_youmail_[i].sapmscore, us_youmail_[i].fraudprobability, us_youmail_[i].unlawful, us_youmail_[i].tcpafraud).str();
         }
+
+        if (!geoAvailable || us_geo_[i].npanxx == 0)
+          geo_str = std::string("zipcode=null, county=null, city=null, latitude=null, longitude=null, timezone=null");
+        else {
+          geo_str = folly::format("zipcode={}, county={}, city={}, latitude={}, longitude={}, timezone={}", 
+            us_geo_[i].zipcode, us_geo_[i].county, us_geo_[i].city, us_geo_[i].latitude, us_geo_[i].longitude, us_geo_[i].timezone).str();
+        }
       }
 
-      folly::format(&record, "  {{{},{},{},{},{},{}}},\n", lrn_str, dno_str, dnc_str, tollfree_str, lerg_str, youmail_str);
+      folly::format(&record, "  {{{},{},{},{},{},{},{}}},\n", lrn_str, dno_str, dnc_str, tollfree_str, lerg_str, youmail_str, geo_str);
 
       //if (record.size() > 1000) {
       //  downstream_->sendBody(folly::IOBuf::copyBuffer(record));
@@ -348,6 +377,7 @@ class TargetHandler final : public RequestHandler {
   folly::small_vector<uint64_t, 16> us_tollfree_;
   folly::small_vector<LergData, 16> us_lerg_;
   folly::small_vector<YoumailData, 16> us_youmail_;
+  folly::small_vector<GeoData, 16> us_geo_;
 };
 
 class ReverseHandler final : public RequestHandler {

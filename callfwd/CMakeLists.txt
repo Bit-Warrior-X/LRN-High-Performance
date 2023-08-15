@@ -14,6 +14,7 @@ set(SOURCES
   DnoMapping.cpp
   LergMapping.cpp
   YoumailMapping.cpp
+  GeoMapping.cpp
   )
 
 add_executable(callfwd ${SOURCES})

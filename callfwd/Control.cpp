@@ -22,7 +22,7 @@
 #include "DnoMapping.h"
 #include "TollFreeMapping.h"
 #include "LergMapping.h"
-
+#include "YoumailMapping.h"
 #include "ACL.h"
 
 using folly::StringPiece;
@@ -38,6 +38,7 @@ static std::atomic<DnoMapping::Data*> mappingDNO;
 static std::atomic<TollFreeMapping::Data*> mappingTollFree;
 static std::atomic<ACL::Data*> currentACL;
 static std::atomic<LergMapping::Data*> mappingLerg;
+static std::atomic<YoumailMapping::Data*> mappingYoumail;
 
 PhoneMapping PhoneMapping::getUS() noexcept { return { mappingUS }; }
 PhoneMapping PhoneMapping::getCA() noexcept { return { mappingCA }; }
@@ -45,6 +46,7 @@ DnoMapping DnoMapping::getDNO() noexcept { return { mappingDNO }; }
 DncMapping DncMapping::getDNC() noexcept { return { mappingDNC }; }
 TollFreeMapping TollFreeMapping::getTollFree() noexcept { return { mappingTollFree }; }
 LergMapping LergMapping::getLerg() noexcept { return { mappingLerg }; }
+YoumailMapping YoumailMapping::getYoumail() noexcept { return { mappingYoumail }; }
 
 bool PhoneMapping::isAvailable() noexcept {
   return !!mappingUS.load() && !!mappingCA.load();
@@ -64,6 +66,10 @@ bool DnoMapping::isAvailable() noexcept {
 
 bool LergMapping::isAvailable() noexcept {
   return !!mappingLerg.load();
+}
+
+bool YoumailMapping::isAvailable() noexcept {
+  return !!mappingYoumail.load();
 }
 
 ACL ACL::get() noexcept { return { currentACL }; }
@@ -307,6 +313,48 @@ static bool loadLergMappingFile(const std::string &path, folly::dynamic meta)
 
   LOG(INFO) << "Building index (" << nrows << " rows)...";
   builder.commit(mappingLerg);
+  folly::hazptr_cleanup();
+  return true;
+}
+
+static bool loadYoumailMappingFile(const std::string &path, folly::dynamic meta)
+{
+  int64_t estimate = meta.getDefault("row_estimate", 0).asInt();
+  const std::string &name = meta.getDefault("file_name", path).asString();
+
+  std::ifstream in;
+  std::vector<char> rbuf(1ull << 19);
+  folly::stop_watch<> watch;
+
+  YoumailMapping::Builder builder;
+  size_t nrows = 0;
+
+  try {
+    in.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+    in.rdbuf()->pubsetbuf(rbuf.data(), rbuf.size());
+    in.open(path);
+
+    builder.sizeHint(estimate + estimate / 20);
+    builder.setMetadata(meta);
+
+    LOG(INFO) << "Reading database from " << name
+      << " (" << estimate << " rows estimated)";
+
+    while (in.good()) {
+      builder.fromCSV(in, nrows, 10000);
+      if (watch.lap(reportPeriod)) {
+        LOG_IF(INFO, estimate != 0) << nrows * 100 / estimate << "% completed";
+        LOG_IF(INFO, estimate == 0) << nrows << " rows read";
+      }
+    }
+    in.close();
+  } catch (std::runtime_error &e) {
+    LOG(ERROR) << osBasename(name) << ':' << nrows << ": " << e.what();
+    return false;
+  }
+
+  LOG(INFO) << "Building index (" << nrows << " rows)...";
+  builder.commit(mappingYoumail);
   folly::hazptr_cleanup();
   return true;
 }
@@ -561,6 +609,9 @@ try {
       status = 'S';
   } else if (cmd == "lerg_reload") {
     if (loadLergMappingFile(stdinPath, msg))
+      status = 'S';
+  } else if (cmd == "youmail_reload") {
+    if (loadYoumailMappingFile(stdinPath, msg))
       status = 'S';
   } else if (cmd == "verify") {
     if (verifyMappingFile(stdinPath, msg))

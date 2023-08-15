@@ -18,6 +18,7 @@
 #include "DnoMapping.h"
 #include "TollFreeMapping.h"
 #include "LergMapping.h"
+#include "YoumailMapping.h"
 #include "AccessLog.h"
 
 using namespace proxygen;
@@ -85,6 +86,7 @@ class TargetHandler final : public RequestHandler {
     bool dncAvailable = false;
     bool tollfreeAvailable = false;
     bool lergAvailable = false;
+    bool youmailAvailable = false;
 
     if (LIKELY(DncMapping::isAvailable())) {
       dncAvailable = true;
@@ -110,6 +112,12 @@ class TargetHandler final : public RequestHandler {
       lergAvailable = false;
     }
 
+    if (LIKELY(YoumailMapping::isAvailable())) {
+      youmailAvailable = true;
+    } else {
+      youmailAvailable = false;
+    }
+
     us_rn_.resize(N);
     ca_rn_.resize(N);
     if (dncAvailable)
@@ -120,6 +128,8 @@ class TargetHandler final : public RequestHandler {
       us_tollfree_.resize(N);
     if (lergAvailable)
       us_lerg_.resize(N);
+    if (youmailAvailable)
+      us_youmail_.resize(N);
 
     PhoneMapping::getUS()
       .getRNs(N, pn_.data(), us_rn_.data());
@@ -157,6 +167,10 @@ class TargetHandler final : public RequestHandler {
         .getLergs(N, lerg_search_key.data(), us_lerg_.data());
     }
 
+    if (youmailAvailable)
+      YoumailMapping::getYoumail()
+        .getYoumails(N, pn_.data(), us_youmail_.data());
+
     ResponseBuilder(downstream_)
       .status(200, "OK")
       .header(HTTP_HEADER_CONTENT_TYPE,
@@ -170,11 +184,12 @@ class TargetHandler final : public RequestHandler {
       if (rn == PhoneNumber::NONE)
         rn = ca_rn_[i];
 
-      std::string lrn_str;
-      std::string dno_str;
-      std::string dnc_str;
-      std::string tollfree_str;
-      std::string lerg_str;
+      std::string lrn_str = std::string("");
+      std::string dno_str = std::string("");
+      std::string dnc_str = std::string("");
+      std::string tollfree_str = std::string("");
+      std::string lerg_str = std::string("");
+      std::string youmail_str = std::string("");
       
       if (json_) {
         if (rn != PhoneNumber::NONE)
@@ -198,15 +213,18 @@ class TargetHandler final : public RequestHandler {
           tollfree_str = std::string("\"is_tollfree\": \"yes\"");
 
         if (!lergAvailable || us_lerg_[i].lerg_key == 0)
-          lerg_str = std::string("\"ocn\":: null, \"operator\": null, \"ocn_type\": null, \"lata\": null, \"rate_center\": null, \"country\": null");
+          lerg_str = std::string("\"ocn\":: null, \"operator\": null, \"ocn_type\": null, \"lata\": null, \"rate_center\": null");
         else {
-          char buffer[1024];
-          std::printf(buffer, "\"ocn\": \"%s\", \"operator\": \"%s\", \"ocn_type\": \"%s\", \"lata\": \"%s\", \"rate_center\": \"%s\", \"country\": \"%s\"",
-              us_lerg_[i].ocn.c_str(), us_lerg_[i].company.c_str(), us_lerg_[i].ocn_type.c_str(), 
-              us_lerg_[i].lata.c_str(), us_lerg_[i].rate_center.c_str(), us_lerg_[i].country.c_str());
-          lerg_str = std::string(buffer);  
+          lerg_str = folly::format("\"ocn\": \"{}\", \"operator\": \"null\", \"ocn_type\": \"null\", \"lata\": \"{}\", \"rate_center\": \"{}\"", 
+            us_lerg_[i].ocn, us_lerg_[i].company, us_lerg_[i].ocn_type, us_lerg_[i].lata, us_lerg_[i].rate_center).str();
         }
-          
+
+        if (!youmailAvailable || us_youmail_[i].pn == 0)
+          youmail_str = std::string("\"youmail_SpamScore\":: null, \"youmail_FraudProbability\": null, \"youmail_Unlawful\": null, \" youmail_TCPAFraudProbability\": null");
+        else {
+          youmail_str = folly::format("\"youmail_SpamScore\": \"{}\", \"youmail_FraudProbability\": \"{}\", \"youmail_Unlawful\": \"{}\", \"youmail_TCPAFraudProbability\": \"{}\"", 
+            us_youmail_[i].sapmscore, us_youmail_[i].fraudprobability, us_youmail_[i].unlawful, us_youmail_[i].tcpafraud).str();
+        }
 
       } else {
         if (rn != PhoneNumber::NONE)
@@ -230,25 +248,34 @@ class TargetHandler final : public RequestHandler {
           tollfree_str = std::string("is_tollfree=yes");
         
         if (!lergAvailable || us_lerg_[i].lerg_key == 0)
-          lerg_str = std::string("ocn= ,operator= ,ocn_type= ,lata= ,rate_center= ,country= ");
+          lerg_str = std::string("ocn=null, operator=null, ocn_type=null, lata=null, rate_center=null, country=null ");
         else {
-          char buffer[1024];
-          std::sprintf(buffer, "ocn=%s,operator=%s,ocn_type=%s,lata=%s,rate_center=%s,country=%s", 
-              us_lerg_[i].ocn.c_str(), us_lerg_[i].company.c_str(), us_lerg_[i].ocn_type.c_str(), 
-              us_lerg_[i].lata.c_str(), us_lerg_[i].rate_center.c_str(), us_lerg_[i].country.c_str()
-            );
-          lerg_str = std::string(buffer);
+          //char buffer[1024];
+          //std::sprintf(buffer, "ocn=%s, operator=%s, ocn_type=%s, lata=%s, rate_center=%s, country=%s", 
+          //    us_lerg_[i].ocn.c_str(), us_lerg_[i].company.c_str(), us_lerg_[i].ocn_type.c_str(), 
+          //    us_lerg_[i].lata.c_str(), us_lerg_[i].rate_center.c_str(), us_lerg_[i].country.c_str()
+          //  );
+          //lerg_str = std::string(buffer);
+          lerg_str = folly::format("ocn={}, operator=null, ocn_type={}, lata={}, rate_center={}", 
+            us_lerg_[i].ocn/*, us_lerg_[i].company*/, us_lerg_[i].ocn_type, us_lerg_[i].lata, us_lerg_[i].rate_center).str();
         }
-          
+
+        if (!youmailAvailable || us_youmail_[i].pn == 0)
+          youmail_str = std::string("youmail_SpamScore=null, youmail_FraudProbability=null, youmail_Unlawful=null, youmail_TCPAFraudProbability=null");
+        else {
+          youmail_str = folly::format("youmail_SpamScore={}, youmail_FraudProbability={}, youmail_Unlawful={}, youmail_TCPAFraudProbability={}", 
+            us_youmail_[i].sapmscore, us_youmail_[i].fraudprobability, us_youmail_[i].unlawful, us_youmail_[i].tcpafraud).str();
+        }
       }
 
-      folly::format(&record, "  {{{},{},{},{},{}}},\n", lrn_str, dno_str, dnc_str, tollfree_str, lerg_str);
+      folly::format(&record, "  {{{},{},{},{},{},{}}},\n", lrn_str, dno_str, dnc_str, tollfree_str, lerg_str, youmail_str);
 
-      if (record.size() > 1000) {
-        downstream_->sendBody(folly::IOBuf::copyBuffer(record));
-        record.clear();
-      }
+      //if (record.size() > 1000) {
+      //  downstream_->sendBody(folly::IOBuf::copyBuffer(record));
+      //  record.clear();
+      //}
     }
+
     if (json_)
       record += "]\n";
 
@@ -320,6 +347,7 @@ class TargetHandler final : public RequestHandler {
   folly::small_vector<uint64_t, 16> us_dno_;
   folly::small_vector<uint64_t, 16> us_tollfree_;
   folly::small_vector<LergData, 16> us_lerg_;
+  folly::small_vector<YoumailData, 16> us_youmail_;
 };
 
 class ReverseHandler final : public RequestHandler {

@@ -101,8 +101,16 @@ void LergMapping::Data::getLergs(size_t N, const uint64_t *pn, LergData *lerg) c
       if (lerg[i].lerg_key == 0)
       {
         const auto it = dic_npa_nxx.find(token_npa_nxx[i], npa_nxx_x / 10);
-        if (it != dic_npa_nxx.cend())
-          lerg[i] = it->second;
+        if (it != dic_npa_nxx.cend()) {
+          LergData data = it->second;
+          lerg[i].lerg_key = data.lerg_key;
+          lerg[i].state = data.state;
+          lerg[i].ocn = data.ocn;
+          lerg[i].rate_center = data.rate_center;
+          lerg[i].ocn_type = data.ocn_type;
+          lerg[i].lata = data.lata;
+          lerg[i].country = data.country;
+        }
         else
           lerg[i].lerg_key = 0;
       }
@@ -183,9 +191,9 @@ LergMapping::Builder& LergMapping::Builder::addRow(std::vector<std::string> rowb
     data.company = (rowbuf[4] == "" ? std::string(" ") : rowbuf[4]);
     data.ocn = (rowbuf[5] == "" ? std::string(" ") : rowbuf[5]);
     data.rate_center = (rowbuf[6] == "" ? std::string(" ") : rowbuf[6]);
-    data.ocn_type = (rowbuf[7] == "" ? std::string(" ") : rowbuf[7]);;
-    data.lata = (rowbuf[8] == "" ? std::string(" ") : rowbuf[8]);;
-    data.country = (rowbuf[9] == "" ? std::string(" ") : rowbuf[9]);;
+    data.ocn_type = (rowbuf[7] == "" ? std::string(" ") : rowbuf[7]);
+    data.lata = (rowbuf[8] == "" ? std::string(" ") : rowbuf[8]);
+    data.country = (rowbuf[9] == "" ? std::string(" ") : rowbuf[9]);
 
     data_->dic_npa_nxx_x.emplace(lerg_key, data);
   }

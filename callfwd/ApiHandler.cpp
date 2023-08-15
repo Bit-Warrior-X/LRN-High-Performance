@@ -20,6 +20,9 @@
 #include "LergMapping.h"
 #include "YoumailMapping.h"
 #include "GeoMapping.h"
+#include "FtcMapping.h"
+#include "F404Mapping.h"
+#include "F606Mapping.h"
 #include "AccessLog.h"
 
 using namespace proxygen;
@@ -89,6 +92,9 @@ class TargetHandler final : public RequestHandler {
     bool lergAvailable = false;
     bool youmailAvailable = false;
     bool geoAvailable = false;
+    bool ftcAvailable = false;
+    bool f404Available = false;
+    bool f606Available = false;
 
     if (LIKELY(DncMapping::isAvailable())) {
       dncAvailable = true;
@@ -126,6 +132,24 @@ class TargetHandler final : public RequestHandler {
       geoAvailable = false;
     }
 
+    if (LIKELY(FtcMapping::isAvailable())) {
+      ftcAvailable = true;
+    } else {
+      ftcAvailable = false;
+    }
+
+    if (LIKELY(F404Mapping::isAvailable())) {
+      f404Available = true;
+    } else {
+      f404Available = false;
+    }
+
+    if (LIKELY(F606Mapping::isAvailable())) {
+      f606Available = true;
+    } else {
+      f606Available = false;
+    }
+
     us_rn_.resize(N);
     ca_rn_.resize(N);
     if (dncAvailable)
@@ -140,6 +164,12 @@ class TargetHandler final : public RequestHandler {
       us_youmail_.resize(N);
     if (geoAvailable)
       us_geo_.resize(N);
+    if (ftcAvailable)
+      us_ftc_.resize(N);
+    if (f404Available)
+      us_f404_.resize(N);
+    if (f606Available)
+      us_f606_.resize(N);
 
     PhoneMapping::getUS()
       .getRNs(N, pn_.data(), us_rn_.data());
@@ -185,6 +215,18 @@ class TargetHandler final : public RequestHandler {
       GeoMapping::getGeo()
         .getGeos(N, pn_.data(), us_geo_.data());
 
+    if (ftcAvailable)
+      FtcMapping::getFtc()
+        .getFtcs(N, pn_.data(), us_ftc_.data());
+
+    if (f404Available)
+      F404Mapping::getF404()
+        .getF404s(N, pn_.data(), us_f404_.data());
+
+    if (f606Available)
+      F606Mapping::getF606()
+        .getF606s(N, pn_.data(), us_f606_.data());
+
     ResponseBuilder(downstream_)
       .status(200, "OK")
       .header(HTTP_HEADER_CONTENT_TYPE,
@@ -205,6 +247,9 @@ class TargetHandler final : public RequestHandler {
       std::string lerg_str = std::string("");
       std::string youmail_str = std::string("");
       std::string geo_str = std::string("");
+      std::string ftc_str = std::string("");
+      std::string f404_str = std::string("");
+      std::string f606_str = std::string("");
       
       if (json_) {
         if (rn != PhoneNumber::NONE)
@@ -228,10 +273,10 @@ class TargetHandler final : public RequestHandler {
           tollfree_str = std::string("\"is_tollfree\": \"yes\"");
 
         if (!lergAvailable || us_lerg_[i].lerg_key == 0)
-          lerg_str = std::string("\"ocn\":: null, \"operator\": null, \"ocn_type\": null, \"lata\": null, \"rate_center\": null");
+          lerg_str = std::string("\"ocn\":: null, \"operator\": null, \"ocn_type\": null, \"lata\": null, \"rate_center\": null, \"country\": null");
         else {
-          lerg_str = folly::format("\"ocn\": \"{}\", \"operator\": \"null\", \"ocn_type\": \"null\", \"lata\": \"{}\", \"rate_center\": \"{}\"", 
-            us_lerg_[i].ocn, us_lerg_[i].company, us_lerg_[i].ocn_type, us_lerg_[i].lata, us_lerg_[i].rate_center).str();
+          lerg_str = folly::format("\"ocn\": \"{}\", \"operator\": \"null\", \"ocn_type\": \"null\", \"lata\": \"{}\", \"rate_center\": \"{}\", \"country\": \"{}\"", 
+            us_lerg_[i].ocn, us_lerg_[i].company, us_lerg_[i].ocn_type, us_lerg_[i].lata, us_lerg_[i].rate_center, us_lerg_[i].country).str();
         }
 
         if (!youmailAvailable || us_youmail_[i].pn == 0)
@@ -242,10 +287,31 @@ class TargetHandler final : public RequestHandler {
         }
         
         if (!geoAvailable || us_geo_[i].npanxx == 0)
-          geo_str = std::string("\"zipcode\":: null, \"county\": null, \"city\": null, \" latitude\": null, \" longitude\": null, \" timezone\": null");
+          geo_str = std::string("\"zipcode\": null, \"county\": null, \"city\": null, \" latitude\": null, \" longitude\": null, \" timezone\": null");
         else {
           geo_str = folly::format("\"zipcode\": \"{}\", \"county\": \"{}\", \"city\": \"{}\", \"latitude\": \"{}\", \"longitude\": \"{}\", \"timezone\": \"{}\"", 
             us_geo_[i].zipcode, us_geo_[i].county, us_geo_[i].city, us_geo_[i].latitude, us_geo_[i].longitude, us_geo_[i].timezone).str();
+        }
+
+        if (!ftcAvailable || us_ftc_[i].pn == 0)
+          ftc_str = std::string("\"is_ftc\": no, \"last_ftc_on\": null, \"first_ftc_on\": null, \"ftc_count\": null");
+        else {
+          ftc_str = folly::format("\"is_ftc\": yes, \"last_ftc_on\": \"{}\", \"first_ftc_on\": \"{}\", \" ftc_count\": \"{}\"", 
+            us_ftc_[i].last_ftc_on, us_ftc_[i].first_ftc_on, us_ftc_[i].ftc_count).str();
+        }
+
+        if (!f404Available || us_f404_[i].pn == 0)
+          f404_str = std::string("\"first_404_on\": null, \"last_404_on\": null");
+        else {
+          f404_str = folly::format("\"first_404_on\": \"{}\", \"last_404_on\": \"{}\"", 
+            us_f404_[i].first_F404_on, us_f404_[i].last_F404_on).str();
+        }
+
+        if (!f606Available || us_f606_[i].pn == 0)
+          f606_str = std::string("\"first_6xx_on\": null, \"last_6xx_on\": null");
+        else {
+          f606_str = folly::format("\"first_6xx_on\": \"{}\", \"last_6xx_on\": \"{}\"", 
+            us_f606_[i].first_F606_on, us_f606_[i].last_F606_on).str();
         }
 
       } else {
@@ -272,14 +338,8 @@ class TargetHandler final : public RequestHandler {
         if (!lergAvailable || us_lerg_[i].lerg_key == 0)
           lerg_str = std::string("ocn=null, operator=null, ocn_type=null, lata=null, rate_center=null, country=null ");
         else {
-          //char buffer[1024];
-          //std::sprintf(buffer, "ocn=%s, operator=%s, ocn_type=%s, lata=%s, rate_center=%s, country=%s", 
-          //    us_lerg_[i].ocn.c_str(), us_lerg_[i].company.c_str(), us_lerg_[i].ocn_type.c_str(), 
-          //    us_lerg_[i].lata.c_str(), us_lerg_[i].rate_center.c_str(), us_lerg_[i].country.c_str()
-          //  );
-          //lerg_str = std::string(buffer);
-          lerg_str = folly::format("ocn={}, operator=null, ocn_type={}, lata={}, rate_center={}", 
-            us_lerg_[i].ocn/*, us_lerg_[i].company*/, us_lerg_[i].ocn_type, us_lerg_[i].lata, us_lerg_[i].rate_center).str();
+          lerg_str = folly::format("ocn={}, operator=null, ocn_type={}, lata={}, rate_center={}, country={}", 
+            us_lerg_[i].ocn/*, us_lerg_[i].company*/, us_lerg_[i].ocn_type, us_lerg_[i].lata, us_lerg_[i].rate_center, us_lerg_[i].country).str();
         }
 
         if (!youmailAvailable || us_youmail_[i].pn == 0)
@@ -295,9 +355,31 @@ class TargetHandler final : public RequestHandler {
           geo_str = folly::format("zipcode={}, county={}, city={}, latitude={}, longitude={}, timezone={}", 
             us_geo_[i].zipcode, us_geo_[i].county, us_geo_[i].city, us_geo_[i].latitude, us_geo_[i].longitude, us_geo_[i].timezone).str();
         }
+
+        if (!ftcAvailable || us_ftc_[i].pn == 0)
+          ftc_str = std::string("is_ftc=no, last_ftc_on=null, first_ftc_on=null, ftc_count=null");
+        else {
+          ftc_str = folly::format("is_ftc=yes, last_ftc_on={}, first_ftc_on={}, ftc_count={}", 
+            us_ftc_[i].last_ftc_on, us_ftc_[i].first_ftc_on, us_ftc_[i].ftc_count).str();
+        }
+
+        if (!f404Available || us_f404_[i].pn == 0)
+          f404_str = std::string("first_404_on=null, last_404_on=null");
+        else {
+          f404_str = folly::format("first_404_on={}, last_404_on={}", 
+            us_f404_[i].first_F404_on, us_f404_[i].last_F404_on).str();
+        }
+
+        if (!f606Available || us_f606_[i].pn == 0)
+          f606_str = std::string("first_6xx_on=null, last_6xx_on=null");
+        else {
+          f606_str = folly::format("first_6xx_on={}, last_6xx_on={}", 
+            us_f606_[i].first_F606_on, us_f606_[i].last_F606_on).str();
+        }
+
       }
 
-      folly::format(&record, "  {{{},{},{},{},{},{},{}}},\n", lrn_str, dno_str, dnc_str, tollfree_str, lerg_str, youmail_str, geo_str);
+      folly::format(&record, "  {{{},{},{},{},{},{},{},{},{},{}}},\n", lrn_str, dno_str, dnc_str, tollfree_str, lerg_str, youmail_str, geo_str, ftc_str, f404_str, f606_str);
 
       //if (record.size() > 1000) {
       //  downstream_->sendBody(folly::IOBuf::copyBuffer(record));
@@ -378,6 +460,9 @@ class TargetHandler final : public RequestHandler {
   folly::small_vector<LergData, 16> us_lerg_;
   folly::small_vector<YoumailData, 16> us_youmail_;
   folly::small_vector<GeoData, 16> us_geo_;
+  folly::small_vector<FtcData, 16> us_ftc_;
+  folly::small_vector<F404Data, 16> us_f404_;
+  folly::small_vector<F606Data, 16> us_f606_;
 };
 
 class ReverseHandler final : public RequestHandler {

@@ -216,7 +216,7 @@ void DnoMapping::Builder::fromCSV(std::istream &in, std::string dnotype, size_t 
 }
 
 void DnoMapping::Data::build() {
-
+  
 }
 
 DnoMapping DnoMapping::Builder::build() {

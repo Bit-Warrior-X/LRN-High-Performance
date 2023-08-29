@@ -196,7 +196,7 @@ class TargetHandler final : public RequestHandler {
         uint64_t rn = us_rn_[i];
         if (rn == PhoneNumber::NONE)
           rn = ca_rn_[i];
-        
+
         if (rn != PhoneNumber::NONE)
           lerg_search_key[i] = rn;
         else
@@ -275,12 +275,12 @@ class TargetHandler final : public RequestHandler {
         if (!lergAvailable || us_lerg_[i].lerg_key == 0)
           lerg_str = std::string("\"ocn\":: null, \"operator\": null, \"ocn_type\": null, \"lata\": null, \"rate_center\": null, \"country\": null");
         else {
-          lerg_str = folly::format("\"ocn\": \"{}\", \"operator\": \"null\", \"ocn_type\": \"null\", \"lata\": \"{}\", \"rate_center\": \"{}\", \"country\": \"{}\"", 
+          lerg_str = folly::format("\"ocn\": \"{}\", \"operator\": \"{}\", \"ocn_type\": \"{}\", \"lata\": \"{}\", \"rate_center\": \"{}\", \"country\": \"{}\"", 
             us_lerg_[i].ocn, us_lerg_[i].company, us_lerg_[i].ocn_type, us_lerg_[i].lata, us_lerg_[i].rate_center, us_lerg_[i].country).str();
         }
 
         if (!youmailAvailable || us_youmail_[i].pn == 0)
-          youmail_str = std::string("\"youmail_SpamScore\":: null, \"youmail_FraudProbability\": null, \"youmail_Unlawful\": null, \" youmail_TCPAFraudProbability\": null");
+          youmail_str = std::string("\"youmail_SpamScore\": null, \"youmail_FraudProbability\": null, \"youmail_Unlawful\": null, \" youmail_TCPAFraudProbability\": null");
         else {
           youmail_str = folly::format("\"youmail_SpamScore\": \"{}\", \"youmail_FraudProbability\": \"{}\", \"youmail_Unlawful\": \"{}\", \"youmail_TCPAFraudProbability\": \"{}\"", 
             us_youmail_[i].sapmscore, us_youmail_[i].fraudprobability, us_youmail_[i].unlawful, us_youmail_[i].tcpafraud).str();
@@ -294,9 +294,9 @@ class TargetHandler final : public RequestHandler {
         }
 
         if (!ftcAvailable || us_ftc_[i].pn == 0)
-          ftc_str = std::string("\"is_ftc\": no, \"last_ftc_on\": null, \"first_ftc_on\": null, \"ftc_count\": null");
+          ftc_str = std::string("\"is_ftc\": \"no\", \"last_ftc_on\": null, \"first_ftc_on\": null, \"ftc_count\": null");
         else {
-          ftc_str = folly::format("\"is_ftc\": yes, \"last_ftc_on\": \"{}\", \"first_ftc_on\": \"{}\", \" ftc_count\": \"{}\"", 
+          ftc_str = folly::format("\"is_ftc\": \"yes\", \"last_ftc_on\": \"{}\", \"first_ftc_on\": \"{}\", \" ftc_count\": \"{}\"", 
             us_ftc_[i].last_ftc_on, us_ftc_[i].first_ftc_on, us_ftc_[i].ftc_count).str();
         }
 
@@ -338,8 +338,8 @@ class TargetHandler final : public RequestHandler {
         if (!lergAvailable || us_lerg_[i].lerg_key == 0)
           lerg_str = std::string("ocn=null, operator=null, ocn_type=null, lata=null, rate_center=null, country=null ");
         else {
-          lerg_str = folly::format("ocn={}, operator=null, ocn_type={}, lata={}, rate_center={}, country={}", 
-            us_lerg_[i].ocn/*, us_lerg_[i].company*/, us_lerg_[i].ocn_type, us_lerg_[i].lata, us_lerg_[i].rate_center, us_lerg_[i].country).str();
+          lerg_str = folly::format("ocn={}, operator={}, ocn_type={}, lata={}, rate_center={}, country={}", 
+            us_lerg_[i].ocn, us_lerg_[i].company, us_lerg_[i].ocn_type, us_lerg_[i].lata, us_lerg_[i].rate_center, us_lerg_[i].country).str();
         }
 
         if (!youmailAvailable || us_youmail_[i].pn == 0)
@@ -379,7 +379,7 @@ class TargetHandler final : public RequestHandler {
 
       }
 
-      folly::format(&record, "  {{{},{},{},{},{},{},{},{},{},{}}},\n", lrn_str, dno_str, dnc_str, tollfree_str, lerg_str, youmail_str, geo_str, ftc_str, f404_str, f606_str);
+      folly::format(&record, "  {{{}, {}, {}, {}, {}, {}, {}, {}, {}, {}}},\n", lrn_str, dno_str, dnc_str, tollfree_str, lerg_str, youmail_str, geo_str, ftc_str, f404_str, f606_str);
 
       //if (record.size() > 1000) {
       //  downstream_->sendBody(folly::IOBuf::copyBuffer(record));

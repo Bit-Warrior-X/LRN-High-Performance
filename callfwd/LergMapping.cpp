@@ -93,8 +93,17 @@ void LergMapping::Data::getLergs(size_t N, const uint64_t *pn, LergData *lerg) c
     for (size_t i = 0; i < M; ++i) {
       uint64_t npa_nxx_x = pn[i] / 1000;
       const auto it = dic_npa_nxx_x.find(token_npa_nxx_x[i], npa_nxx_x);
-      if (it != dic_npa_nxx_x.cend())
-        lerg[i] = it->second;
+      if (it != dic_npa_nxx_x.cend()) {
+        LergData data = it->second;
+        lerg[i].lerg_key = data.lerg_key;
+        lerg[i].state = data.state;
+        lerg[i].company = data.company;
+        lerg[i].ocn = data.ocn;
+        lerg[i].rate_center = data.rate_center;
+        lerg[i].ocn_type = data.ocn_type;
+        lerg[i].lata = data.lata;
+        lerg[i].country = data.country;
+      }
       else
         lerg[i].lerg_key = 0;
 
@@ -105,6 +114,7 @@ void LergMapping::Data::getLergs(size_t N, const uint64_t *pn, LergData *lerg) c
           LergData data = it->second;
           lerg[i].lerg_key = data.lerg_key;
           lerg[i].state = data.state;
+          lerg[i].company = data.company;
           lerg[i].ocn = data.ocn;
           lerg[i].rate_center = data.rate_center;
           lerg[i].ocn_type = data.ocn_type;
@@ -166,6 +176,7 @@ LergMapping::Builder& LergMapping::Builder::addRow(std::vector<std::string> rowb
 
     LergData data;
     data.lerg_key = lerg_key;
+    data.state = rowbuf[3];
     data.company = rowbuf[4];
     data.ocn = rowbuf[5];
     data.rate_center = rowbuf[6];
@@ -188,6 +199,7 @@ LergMapping::Builder& LergMapping::Builder::addRow(std::vector<std::string> rowb
 
     LergData data;
     data.lerg_key = lerg_key;
+    data.state = (rowbuf[3] == "" ? std::string(" ") : rowbuf[3]);
     data.company = (rowbuf[4] == "" ? std::string(" ") : rowbuf[4]);
     data.ocn = (rowbuf[5] == "" ? std::string(" ") : rowbuf[5]);
     data.rate_center = (rowbuf[6] == "" ? std::string(" ") : rowbuf[6]);

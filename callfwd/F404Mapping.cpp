@@ -127,17 +127,22 @@ void F404Mapping::Builder::setMetadata(const folly::dynamic &meta) {
 F404Mapping::Builder& F404Mapping::Builder::addRow(std::vector<std::string> rowbuf) {
   uint64_t pn;
 
-  //LOG(INFO) << "Add new row " << rowbuf[0];
-
   std::string phoneNumberStr = rowbuf[0];
-  phoneNumberStr = phoneNumberStr.substr(1); //19169954938,2021-02-09 04:11:39,2021-07-03 14:53:37,\N
+  phoneNumberStr = phoneNumberStr.substr(1, 10); //19169954938,2021-02-09 04:11:39,2021-07-03 14:53:37,\N
   pn = std::stoll(phoneNumberStr);
-  
+
+  //LOG(INFO) << "Add new row " << pn;
   //LOG(INFO) << "F404_key method dict is " << pn;  
-  if (data_->dict.count(pn))
-    throw std::runtime_error("F404Mapping::Builder: duplicate key");
-  if (data_->pnColumn.size() >= MAXROWS)
-    throw std::runtime_error("F404Mapping::Builder: too much rows");
+  
+  if (data_->dict.count(pn)) {
+    //throw std::runtime_error("F404Mapping::Builder: duplicate key");
+    return *this;
+  }
+
+  if (data_->pnColumn.size() >= MAXROWS) {
+    //throw std::runtime_error("F404Mapping::Builder: too much rows");
+    return *this;
+  }
 
   F404Data data;
   data.pn = pn;
@@ -147,6 +152,7 @@ F404Mapping::Builder& F404Mapping::Builder::addRow(std::vector<std::string> rowb
   data_->dict.emplace(pn, data);
   data_->pnColumn.push_back(PhoneList{pn, MAXROWS});
   data_->F404Index.push_back(PhoneList{pn, MAXROWS});
+
   return *this;
 }
 
@@ -179,7 +185,7 @@ void F404Mapping::Builder::fromCSV(std::istream &in, size_t &line, size_t limit)
         parts.push_back(part);
     }
 
-    if (!(linebuf[0] >= '0' && linebuf[0] <= '9'))
+    if (linebuf[0] != '1')
       continue;
 
     //LOG(INFO) << "part size is " << parts.size();

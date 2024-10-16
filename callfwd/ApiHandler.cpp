@@ -379,9 +379,12 @@ class TargetHandler final : public RequestHandler {
 
       }
 
-      folly::format(&record, "  {{{}, {}, {}, {}, {}, {}, {}, {}, {}, {}}},\n", lrn_str, dno_str, dnc_str, tollfree_str, lerg_str, youmail_str, geo_str, ftc_str, f404_str, f606_str);
+      if (i == N-1)
+        folly::format(&record, "  {{{}, {}, {}, {}, {}, {}, {}, {}, {}, {}}}\n", lrn_str, dno_str, dnc_str, tollfree_str, lerg_str, youmail_str, geo_str, ftc_str, f404_str, f606_str);
+      else
+        folly::format(&record, "  {{{}, {}, {}, {}, {}, {}, {}, {}, {}, {}}},\n", lrn_str, dno_str, dnc_str, tollfree_str, lerg_str, youmail_str, geo_str, ftc_str, f404_str, f606_str);
 
-      //if (record.size() > 1000) {
+      //if (record.size() > 1000) {   
       //  downstream_->sendBody(folly::IOBuf::copyBuffer(record));
       //  record.clear();
       //}

@@ -244,7 +244,7 @@ class CallFwdControl(object):
                 path = candidates[-1]
 
         msg = { "cmd": "404_reload" }
-        self._read_db_op(msg, path, 38)
+        self._read_db_op(msg, path, 51)
 
         if link_to is not None:
             if os.path.exists(link_to):
@@ -260,7 +260,7 @@ class CallFwdControl(object):
                 path = candidates[-1]
 
         msg = { "cmd": "606_reload" }
-        self._read_db_op(msg, path, 190)
+        self._read_db_op(msg, path, 51)
 
         if link_to is not None:
             if os.path.exists(link_to):
